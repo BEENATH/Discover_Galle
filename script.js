@@ -34,10 +34,46 @@ document.querySelectorAll('[data-track]').forEach(link => {
   });
 });
 
-// Contact form: Web3Forms handles delivery. This handler only adds analytics and status feedback.
+// Contact form: send through Web3Forms and track a lead only after successful delivery.
 const contactForm = document.getElementById('contactForm');
-contactForm.addEventListener('submit', () => {
-  const interest = contactForm.elements.interest.value;
-  window.trackTourismEvent?.('generate_lead', { visitor_interest: interest });
-  document.getElementById('formStatus').textContent = 'Sending your inquiry…';
-});
+
+if (contactForm) {
+  contactForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const submitButton = contactForm.querySelector('button[type="submit"]');
+    const status = document.getElementById('formStatus');
+    const originalButtonText = submitButton.innerHTML;
+
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sending...';
+    status.textContent = 'Sending your inquiry…';
+
+    try {
+      const response = await fetch(contactForm.action, {
+        method: 'POST',
+        body: new FormData(contactForm),
+        headers: { Accept: 'application/json' }
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Your inquiry could not be sent.');
+      }
+
+      const interest = contactForm.elements.interest.value;
+      window.trackTourismEvent?.('generate_lead', {
+        visitor_interest: interest
+      });
+
+      status.textContent = 'Thank you! Your inquiry has been sent successfully.';
+      contactForm.reset();
+    } catch (error) {
+      console.error('Web3Forms submission error:', error);
+      status.textContent = 'Sorry, we could not send your inquiry. Please try again.';
+    } finally {
+      submitButton.disabled = false;
+      submitButton.innerHTML = originalButtonText;
+    }
+  });
+}
